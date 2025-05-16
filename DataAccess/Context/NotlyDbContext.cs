@@ -5,9 +5,8 @@ namespace DataAccess.Context
 {
     public class NotlyDbContext : DbContext
     {
-        protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+        public NotlyDbContext(DbContextOptions<NotlyDbContext> options) : base(options)
         {
-            optionsBuilder.UseSqlServer("Server=HAROCAN\\SQLEXPRESS01;Initial Catalog=NotlyDb;Integrated Security=True;TrustServerCertificate=True;");
         }
 
         public DbSet<Note> Notes { get; set; }

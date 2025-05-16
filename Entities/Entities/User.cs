@@ -11,12 +11,14 @@ namespace Entities.Entities
         public int Id { get; set; }
         public string FullName { get; set; }            // Kullanıcı adı
         public string Email { get; set; }               // Email (giriş için)
-        public string PasswordHash { get; set; }        // Şifre hash olarak tutulacak
+        public byte[] PasswordHash { get; set; }
+        public byte[] PasswordSalt { get; set; }
 
         // Profil bilgileri
         public string ProfilePictureUrl { get; set; }   // Profil fotoğrafı URL'si
-        public string Bio { get; set; }                  // Kullanıcı biyografisi
+        public string? Bio { get; set; }                  // Kullanıcı biyografisi
         public string University { get; set; }           // Üniversite ismi
+        public string? Department { get; set; }
 
         // İlişkiler
         public ICollection<Course> Courses { get; set; }    // Kullanıcının eklediği dersler

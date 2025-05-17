@@ -1,17 +1,15 @@
-﻿using DataAccess.Abstract;
+﻿
+using DataAccess.Abstract;
 using DataAccess.Context;
-using Microsoft.EntityFrameworkCore;
-using System;
+using Microsoft.EntityFrameworkCore; 
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace DataAccess.Repositories
 {
     public class GenericRepository<T> : IGenericDal<T> where T : class
     {
-        protected readonly NotlyDbContext _context;
+        protected readonly NotlyDbContext _context; 
         protected readonly DbSet<T> _dbSet;
 
         public GenericRepository(NotlyDbContext context)
@@ -30,19 +28,20 @@ namespace DataAccess.Repositories
             _dbSet.Remove(entity);
             _context.SaveChanges();
         }
-        public List<T> GetAll()
+// Bu zaten virtual yapılmış, doğru.
         {
             return _dbSet.ToList();
         }
-        public T GetById(int id)
+
+        public virtual T GetById(int id) 
         {
             return _dbSet.Find(id);
         }
+
         public void Update(T entity)
         {
             _dbSet.Update(entity);
             _context.SaveChanges();
         }
     }
-
 }

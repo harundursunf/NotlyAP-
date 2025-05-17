@@ -5,18 +5,18 @@ using Businness.Concrete;
 using DataAccess.Abstract;
 using DataAccess.Ef;
 using Core.Utilities.Security.JWT;
-using Microsoft.AspNetCore.Builder; // WebApplicationBuilder ve WebApplication için gerekli
-using Microsoft.Extensions.DependencyInjection; // AddDbContext, AddScoped, AddControllers için gerekli
-using Microsoft.Extensions.Hosting; // IsDevelopment için gerekli
-using Microsoft.Extensions.Configuration; // GetConnectionString için gerekli
+using Microsoft.AspNetCore.Builder;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Configuration;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// DbContext'i ekle, connection string appsettings.json'dan okunuyor
+// DbContext
 builder.Services.AddDbContext<NotlyDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
-// Servisleri ekle (Scoped lifetime kullanýlýyor)
+// Servisler
 builder.Services.AddScoped<ICommentService, CommentManager>();
 builder.Services.AddScoped<ICommentDal, EfCommentDal>();
 
@@ -40,38 +40,25 @@ builder.Services.AddScoped<IAuthService, AuthManager>();
 
 builder.Services.AddControllers();
 
-// Swagger servislerini ekle
+// Swagger
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-// ************************************
-// CORS Yapýlandýrmasý Baþlangýcý
-// ************************************
+// CORS Yapýlandýrmasý
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowFrontendOrigin", // Politikanýn adý
-        builder => builder.WithOrigins("http://localhost:5174") // Frontend uygulamanýzýn ÇALIÞTIÐI DOÐRU ADRES
-                         .AllowAnyHeader() // Tüm baþlýklara izin ver
-                         .AllowAnyMethod()); // Tüm HTTP metotlarýna (GET, POST, PUT, DELETE vb.) izin ver
-
-    // Eðer frontend'iniz farklý portlarda da çalýþýyorsa (örneðin hem 5173 hem 5174), birden fazla origin ekleyebilirsiniz:
-    // options.AddPolicy("AllowFrontendOrigin",
-    //     builder => builder.WithOrigins("http://localhost:5173", "http://localhost:5174")
-    //                      .AllowAnyHeader()
-    //                      .AllowAnyMethod());
+    options.AddPolicy("AllowFrontendOrigin",
+        policy => policy.WithOrigins("http://localhost:5173", "http://localhost:5174") // Her iki porta da izin verildi
+                        .AllowAnyHeader()
+                        .AllowAnyMethod());
 });
-// ************************************
-// CORS Yapýlandýrmasý Sonu
-// ************************************
-
 
 var app = builder.Build();
 
+// Geliþtirme ortamý için Swagger
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
-
-    // Swagger UI'yi root ("/") dizinine aç
     app.UseSwaggerUI(c =>
     {
         c.SwaggerEndpoint("/swagger/v1/swagger.json", "Notly API V1");
@@ -81,15 +68,9 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
-// ************************************
-// CORS Middleware Kullanýmý Baþlangýcý
-// ************************************
-// CORS middleware'ini UseAuthorization'dan önce kullanýn
-app.UseCors("AllowFrontendOrigin"); // Tanýmladýðýmýz politikanýn adýný belirtiyoruz
-// ************************************
-// CORS Middleware Kullanýmý Sonu
-// ************************************
+app.UseRouting(); // ROUTING EKLENDÝ — önemli!
 
+app.UseCors("AllowFrontendOrigin"); // CORS MIDDLEWARE doðru sýrada
 
 app.UseAuthorization();
 

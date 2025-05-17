@@ -1,67 +1,105 @@
-﻿using Businness.Abstract;
-using Core.Dto;
-using Core.Dto.Core.Dto;
+﻿// WebApi/Controllers/LikesController.cs
+using Businness.Abstract;
+using Core.Dto.Core.Dto; // Ensure this is the correct namespace for LikeDto
 using Microsoft.AspNetCore.Mvc;
 using System.Collections.Generic;
+using System.Linq;
+using Microsoft.AspNetCore.Authorization;
 
-namespace WebApi.Controllers
+// [Authorize] // Uncomment if like operations require authorization
+[ApiController]
+[Route("api/[controller]")]
+public class LikesController : ControllerBase
 {
-    [ApiController]
-    [Route("api/[controller]")]
-    public class LikesController : ControllerBase
+    private readonly ILikeService _likeService;
+
+    public LikesController(ILikeService likeService)
     {
-        private readonly ILikeService _likeService;
+        _likeService = likeService;
+    }
 
-        public LikesController(ILikeService likeService)
+    [HttpGet]
+    public ActionResult<List<LikeDto>> GetAll()
+    {
+        var likes = _likeService.GetAll();
+        return Ok(likes);
+    }
+
+    [HttpGet("{id}", Name = "GetLikeById")] // Added Name for CreatedAtAction
+    public ActionResult<LikeDto> GetById(int id)
+    {
+        var like = _likeService.GetById(id);
+        if (like == null)
         {
-            _likeService = likeService;
+            return NotFound($"Like with ID {id} not found.");
+        }
+        return Ok(like);
+    }
+
+    [HttpPost]
+    public IActionResult Add([FromBody] LikeDto likeDto) 
+    {
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
         }
 
-        [HttpGet]
-        public ActionResult<List<LikeDto>> GetAll()
+        LikeDto createdLikeDto = _likeService.Add(likeDto);
+
+        if (createdLikeDto == null || createdLikeDto.Id == 0)
         {
-            return _likeService.GetAll();
+           
+            return StatusCode(500, "Beğeni oluşturulamadı veya oluşturulan beğeniye ait ID alınamadı.");
         }
 
-        [HttpGet("{id}")]
-        public ActionResult<LikeDto> GetById(int id)
+        
+        return CreatedAtAction(nameof(GetById), new { id = createdLikeDto.Id }, createdLikeDto);
+    }
+
+    [HttpPut("{id}")] 
+    public IActionResult Update(int id, [FromBody] LikeDto likeDto)
+    {
+        if (id != likeDto.Id)
         {
-            var like = _likeService.GetById(id);
-            if (like == null) return NotFound();
-            return like;
+            return BadRequest("ID mismatch: ID in URL does not match ID in request body.");
+        }
+        if (!ModelState.IsValid)
+        {
+            return BadRequest(ModelState);
         }
 
-        [HttpPost]
-        public IActionResult Add(LikeDto likeDto)
+        var existingLike = _likeService.GetById(id);
+        if (existingLike == null)
         {
-            _likeService.Add(likeDto);
-            return Ok();
+            return NotFound($"Like with ID {id} not found for update.");
         }
 
-        [HttpPut]
-        public IActionResult Update(LikeDto likeDto)
+        _likeService.Update(likeDto); 
+        return NoContent(); 
+    }
+
+    [HttpDelete("{id}")]
+    public IActionResult Delete(int id)
+    {
+        var likeDto = _likeService.GetById(id); 
+        if (likeDto == null)
         {
-            _likeService.Update(likeDto);
-            return Ok();
+            return NotFound($"Like with ID {id} not found for deletion.");
         }
 
-        [HttpDelete("{id}")]
-        public IActionResult Delete(int id)
-        {
-            var likeDto = _likeService.GetById(id);
-            if (likeDto == null) return NotFound();
+        
+        _likeService.Delete(likeDto);
+        return NoContent(); 
+    }
 
-            _likeService.Delete(likeDto);
-            return Ok();
-        }
-        [HttpGet("user/{userId}")]
-        public ActionResult<List<LikeDto>> GetLikesByUserId(int userId)
+    [HttpGet("user/{userId}")]
+    public ActionResult<List<LikeDto>> GetLikesByUserId(int userId)
+    {
+        var likes = _likeService.GetLikesByUserId(userId);
+        if (likes == null || !likes.Any())
         {
-            var likes = _likeService.GetLikesByUserId(userId);
-            if (likes == null || likes.Count == 0)
-                return NotFound();
-
-            return Ok(likes);
+            return NotFound($"No likes found for User ID {userId}.");
         }
+        return Ok(likes);
     }
 }

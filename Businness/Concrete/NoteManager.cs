@@ -21,7 +21,7 @@ namespace Businness.Concrete
 
         public void Add(NoteDto noteDto)
         {
-            // DTO -> Entity dönüşümü
+           
             var noteEntity = noteDto.Adapt<Note>();
             _noteDal.Add(noteEntity);
         }
@@ -35,7 +35,6 @@ namespace Businness.Concrete
         public List<NoteDto> GetAll()
         {
             var notes = _noteDal.GetAll();
-            // Entity list -> DTO list dönüşümü
             return notes.Adapt<List<NoteDto>>();
         }
 

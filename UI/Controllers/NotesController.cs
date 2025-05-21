@@ -1,8 +1,10 @@
-﻿using Businness.Abstract;
-using Core.Dto;
-using Core.Dto.Core.Dto;
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
+using Businness.Abstract;
+using Core.Dto; // NoteDto için (namespace'inizi kontrol edin)
 using System.Collections.Generic;
+using System.Linq; // Any() metodu için
+using System.Security.Claims; // ClaimTypes için
+using Microsoft.AspNetCore.Authorization; // [Authorize] attribute'ü için bu using eklenmeli
 
 namespace WebApi.Controllers
 {
@@ -17,56 +19,176 @@ namespace WebApi.Controllers
             _noteService = noteService;
         }
 
-        [HttpGet]
-        public ActionResult<List<NoteDto>> GetAll()
+        // Yardımcı metot: Token'dan o anki giriş yapmış kullanıcının ID'sini alır
+        private int? GetCurrentUserId()
         {
-            var notes = _noteService.GetAll();
-            return Ok(notes);
+            var userIdClaim = User.FindFirst(ClaimTypes.NameIdentifier);
+            if (userIdClaim != null && int.TryParse(userIdClaim.Value, out int parsedUserId))
+            {
+                return parsedUserId;
+            }
+            return null;
         }
 
         [HttpGet("{id}")]
+        [Authorize] // Endpoint'i koru
         public ActionResult<NoteDto> GetById(int id)
         {
-            var note = _noteService.GetById(id);
-            if (note == null) return NotFound();
-            return Ok(note);
+            var currentUserId = GetCurrentUserId();
+            var noteDto = _noteService.GetById(id, currentUserId);
+
+            if (noteDto == null)
+            {
+                return NotFound(new { message = $"Not ID {id} bulunamadı." });
+            }
+            return Ok(noteDto);
         }
 
-        [HttpPost]
-        public IActionResult Add(NoteDto noteDto)
+        [HttpGet]
+        [Authorize] // Endpoint'i koru
+        public ActionResult<List<NoteDto>> GetAll()
         {
-            _noteService.Add(noteDto);
-            return CreatedAtAction(nameof(GetById), new { id = noteDto.Id }, noteDto);
-        }
-
-        [HttpPut("{id}")]
-        public IActionResult Update(int id, NoteDto noteDto)
-        {
-            if (id != noteDto.Id)
-                return BadRequest("Id mismatch");
-
-            _noteService.Update(noteDto);
-            return NoContent();
-        }
-
-        [HttpDelete("{id}")]
-        public IActionResult Delete(int id)
-        {
-            var noteDto = _noteService.GetById(id);
-            if (noteDto == null) return NotFound();
-
-            _noteService.Delete(noteDto);
-            return NoContent();
+            var currentUserId = GetCurrentUserId();
+            var notes = _noteService.GetAll(currentUserId);
+            return Ok(notes ?? new List<NoteDto>());
         }
 
         [HttpGet("user/{userId}")]
-        public ActionResult<List<NoteDto>> GetNotesByUserId(int userId)
+        [Authorize] // Endpoint'i koru
+        public ActionResult<List<NoteDto>> GetNotesByAuthorId(int userId)
         {
-            var notes = _noteService.GetNotesByUserId(userId);
-            if (notes == null || notes.Count == 0)
-                return NotFound();
+            var currentLoggedInUserId = GetCurrentUserId();
+            var notes = _noteService.GetNotesByUserId(userId, currentLoggedInUserId);
 
+            if (notes == null)
+            {
+                return Ok(new List<NoteDto>());
+            }
             return Ok(notes);
+        }
+
+        [HttpPost]
+        [Authorize] // YENİ NOT EKLEME KESİNLİKLE YETKİLENDİRME GEREKTİRİR!
+        public IActionResult Add([FromBody] NoteDto noteDto) // İdealde burada NoteCreateDto gibi UserId içermeyen bir DTO kullanılır.
+        {
+            var currentUserId = GetCurrentUserId();
+         
+            if (!currentUserId.HasValue)
+            {
+              
+                return Unauthorized(new { message = "Kullanıcı kimliği doğrulanamadı veya bulunamadı." });
+            }
+
+           
+            noteDto.UserId = currentUserId.Value;
+
+           
+            if (!ModelState.IsValid) 
+            {
+              
+                return BadRequest(ModelState);
+            }
+
+          
+            if (noteDto.CourseId == 0) 
+            {
+                
+                ModelState.AddModelError("CourseId", "Kurs ID alanı zorunludur ve 0'dan farklı olmalıdır.");
+                return BadRequest(ModelState); 
+            }
+
+            if (string.IsNullOrEmpty(noteDto.Title))
+            {
+                ModelState.AddModelError("Title", "Başlık alanı zorunludur.");
+                return BadRequest(ModelState); 
+            }
+
+
+
+            _noteService.Add(noteDto); 
+
+            if (noteDto.Id > 0)
+            {
+                
+                return CreatedAtAction(nameof(GetById), new { id = noteDto.Id }, noteDto);
+            }
+
+            return Ok(new { message = "Not başarıyla eklendi.", noteId = noteDto.Id }); // Id'yi de ekleyebiliriz.
+        }
+
+        [HttpPut("{id}")]
+        [Authorize] // Endpoint'i koru
+        public IActionResult Update(int id, [FromBody] NoteDto noteDto)
+        {
+            var currentUserId = GetCurrentUserId();
+            if (!currentUserId.HasValue)
+            {
+                return Unauthorized(new { message = "Kullanıcı kimliği doğrulanamadı." });
+            }
+
+            
+            var existingNote = _noteService.GetById(id, currentUserId.Value); 
+                                                                              
+            if (existingNote == null)
+            {
+                return NotFound(new { message = $"Güncellenecek Not ID {id} bulunamadı." });
+            }
+
+            if (existingNote.UserId != currentUserId.Value /* && !User.IsInRole("Admin") */) // Admin rol kontrolü ekleyebilirsiniz.
+            {
+                return Forbid("Bu notu güncelleme yetkiniz yok."); // HTTP 403
+            }
+
+            if (id != noteDto.Id && noteDto.Id != 0)
+            {
+                return BadRequest(new { message = "ID uyuşmazlığı." });
+            }
+            noteDto.Id = id; 
+            noteDto.UserId = currentUserId.Value; 
+
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+            if (noteDto.CourseId == 0)
+            {
+                ModelState.AddModelError("CourseId", "Kurs ID alanı zorunludur ve 0'dan farklı olmalıdır.");
+                return BadRequest(ModelState);
+            }
+            if (string.IsNullOrEmpty(noteDto.Title))
+            {
+                ModelState.AddModelError("Title", "Başlık alanı zorunludur.");
+                return BadRequest(ModelState);
+            }
+
+            _noteService.Update(noteDto);
+            return NoContent(); 
+        }
+
+        [HttpDelete("{id}")]
+        [Authorize] 
+        public IActionResult Delete(int id)
+        {
+            var currentUserId = GetCurrentUserId();
+            if (!currentUserId.HasValue)
+            {
+                return Unauthorized(new { message = "Kullanıcı kimliği doğrulanamadı." });
+            }
+
+            
+            var noteToDelete = _noteService.GetById(id, currentUserId.Value); 
+            if (noteToDelete == null)
+            {
+                return NotFound(new { message = $"Silinecek Not ID {id} bulunamadı." });
+            }
+
+            if (noteToDelete.UserId != currentUserId.Value /* && !User.IsInRole("Admin") */) // Admin rol kontrolü ekleyebilirsiniz.
+            {
+                return Forbid("Bu notu silme yetkiniz yok."); 
+            }
+
+            _noteService.Delete(id);
+            return NoContent(); 
         }
     }
 }

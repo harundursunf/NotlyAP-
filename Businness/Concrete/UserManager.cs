@@ -1,97 +1,125 @@
 ﻿using Businness.Abstract;
-using Core.Dto.Core.Dto; // UserDto'nun bulunduğu namespace
-using DataAccess.Abstract; // IUserDal'ın bulunduğu namespace
-using Entities.Entities; // User entity'nin bulunduğu namespace
-using Mapster; // Mapster için
+using Core.Dto.Core.Dto;
+using DataAccess.Abstract;
+using Entities.Entities;
+using Mapster;
+using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Configuration;
+using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
-using System.Threading.Tasks; // Eğer async metotlar kullanıyorsanız
+using System.Threading.Tasks;
 
 namespace Businness.Concrete
 {
     public class UserManager : IUserService
     {
         private readonly IUserDal _userDal;
+        private readonly IConfiguration _configuration;
 
-        public UserManager(IUserDal userDal)
+        public UserManager(IUserDal userDal, IConfiguration configuration)
         {
             _userDal = userDal;
+            _configuration = configuration;
         }
 
-        // Mevcut CRUD metotları (DTO ile çalışıyorlar)
+        public UserDto GetById(int id)
+        {
+            var user = _userDal.GetById(id);
+            return user?.Adapt<UserDto>();
+        }
+
+        public List<UserDto> GetAll()
+        {
+            var users = _userDal.GetAll();
+       
+            return users?.Select(u => u.Adapt<UserDto>()).ToList();
+        }
+
         public void Add(UserDto userDto)
         {
-            // Şifre hashleme burada veya ayrı bir Register/Auth servisinde yapılmalı
             var user = userDto.Adapt<User>();
             _userDal.Add(user);
         }
 
         public void Update(UserDto userDto)
         {
-            // Güncelleme mantığı: Sadece DTO'da gelen alanları güncellemek için entity'yi çekip eşleme yapmalısınız
-            var user = _userDal.GetById(userDto.Id); // Entity'yi çek
-            if (user != null)
+            var userToUpdate = _userDal.GetById(userDto.Id);
+            if (userToUpdate != null)
             {
-                 // DTO'dan gelen güncel bilgileri (Department, Bio, University, ProfilePictureUrl) entity'ye eşle
-                userDto.Adapt(user); // Mapster ile eşleme
-                _userDal.Update(user); // Entity'yi güncelle
+                userToUpdate.FullName = userDto.FullName;
+                userToUpdate.Email = userDto.Email;
+                userToUpdate.University = userDto.University;
+                userToUpdate.Department = userDto.Department;
+                userToUpdate.Bio = userDto.Bio;
+      
+                _userDal.Update(userToUpdate);
             }
         }
 
-        public void Delete(UserDto userDto)
+        public async Task<bool> UpdateProfileDetailsAsync(int userId, UserProfileUpdateDto profileDto)
         {
-            // Delete metodu genellikle sadece ID almalı veya entity çekip silmeli
-            var user = _userDal.GetById(userDto.Id); // Entity'yi çek
-             if (user != null)
-             {
-                 _userDal.Delete(user); // Entity silme
-             }
+            var userEntity = _userDal.GetById(userId);
+            if (userEntity == null)
+            {
+                return false;
+            }
+
+            userEntity.Bio = profileDto.Bio ?? userEntity.Bio;
+            userEntity.University = profileDto.University ?? userEntity.University;
+            userEntity.Department = profileDto.Department ?? userEntity.Department;
+
+            _userDal.Update(userEntity);
+            return true;
         }
 
-        public UserDto GetById(int id)
+        public async Task<string> UploadProfilePictureAsync(int userId, IFormFile file)
         {
-            // Entity'yi çek ve DTO'ya dönüştür
-            var user = _userDal.GetById(id); // Entity'yi çek
-            return user?.Adapt<UserDto>(); // DTO'ya dönüştür ve döndür
+            if (file == null || file.Length == 0) return null;
+
+            var userEntity = _userDal.GetById(userId);
+            if (userEntity == null) return null;
+
+            var fileExtension = Path.GetExtension(file.FileName).ToLowerInvariant();
+            var allowedExtensions = new[] { ".jpg", ".jpeg", ".png" };
+            if (!allowedExtensions.Contains(fileExtension)) return null;
+
+            var uploadPathConfig = _configuration["FileUploadSettings:ProfilePicturesPath"];
+            if (string.IsNullOrEmpty(uploadPathConfig)) return null;
+
+            var physicalUploadFolder = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", uploadPathConfig);
+
+            if (!Directory.Exists(physicalUploadFolder))
+            {
+                Directory.CreateDirectory(physicalUploadFolder);
+            }
+
+            var newFileName = $"{Guid.NewGuid()}{fileExtension}";
+            var physicalFilePath = Path.Combine(physicalUploadFolder, newFileName);
+
+            using (var stream = new FileStream(physicalFilePath, FileMode.Create))
+            {
+                await file.CopyToAsync(stream);
+            }
+
+            var relativeUrl = Path.Combine("/", uploadPathConfig, newFileName).Replace("\\", "/");
+
+    
+
+            userEntity.ProfilePictureUrl = relativeUrl; 
+            _userDal.Update(userEntity);
+
+            return relativeUrl; 
         }
 
-        public List<UserDto> GetAll()
+        public void Delete(int id)
         {
-            // Tüm Entity'leri çek ve DTO listesine dönüştür
-            return _userDal.GetAll().Adapt<List<UserDto>>();
-        }
-
-
-        // Yeni eklenecek metot implementasyonu
-        public void UpdateProfilePictureUrl(int userId, string profilePictureUrl)
-        {
-            // Kullanıcıyı DAL üzerinden Entity olarak çek
-            var user = _userDal.GetById(userId); // IUserDal'da GetById metodu Entity döndürmeli
+            var user = _userDal.GetById(id);
             if (user != null)
             {
-                // Profil fotoğrafı URL'sini güncelle
-                user.ProfilePictureUrl = profilePictureUrl;
-                // Kullanıcıyı veritabanında güncelle
-                _userDal.Update(user); // IUserDal'da Update metodu Entity almalı
+                _userDal.Delete(user);
             }
-            // Kullanıcı bulunamazsa hata fırlatılabilir veya loglanabilir
         }
-
-        // Eğer IUserDal async metotlar kullanıyorsa, UserManager'da async olmalı:
-        // public async Task UpdateProfilePictureUrlAsync(int userId, string profilePictureUrl)
-        // {
-        //     var user = await _userDal.GetByIdAsync(userId);
-        //     if (user != null)
-        //     {
-        //         user.ProfilePictureUrl = profilePictureUrl;
-        //         await _userDal.UpdateAsync(user);
-        //     }
-        // }
-
-        // Eğer Service katmanında Entity döndüren bir GetById metodu eklediyseniz:
-        // public Entities.Entities.User GetEntityById(int id)
-        // {
-        //      return _userDal.GetById(id); // DAL'dan entity'yi döndür
-        // }
     }
 }

@@ -1,20 +1,15 @@
-﻿using Core.Dto.Core.Dto;
-using System;
+﻿using Core.Dto;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Businness.Abstract
 {
     public interface INoteService
     {
         void Add(NoteDto noteDto);
-        void Update (NoteDto noteDto);
-        void Delete (NoteDto noteDto);
-        NoteDto GetById (int id);
-        List <NoteDto> GetAll ();
-
-        List<NoteDto> GetNotesByUserId(int userId);
+        void Update(NoteDto noteDto);
+        void Delete(int noteId);
+        NoteDto GetById(int noteId, int? currentLoggedInUserId);
+        List<NoteDto> GetAll(int? currentLoggedInUserId);
+        List<NoteDto> GetNotesByUserId(int userId, int? currentLoggedInUserId);
     }
 }

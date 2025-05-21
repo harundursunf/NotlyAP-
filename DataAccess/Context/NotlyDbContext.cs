@@ -7,8 +7,8 @@ namespace DataAccess.Context
     {
         public NotlyDbContext(DbContextOptions<NotlyDbContext> options) : base(options)
         {
-        }
 
+        }
         public DbSet<Note> Notes { get; set; }
         public DbSet<User> Users { get; set; }
         public DbSet<Course> Courses { get; set; }
@@ -19,12 +19,11 @@ namespace DataAccess.Context
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
-
             modelBuilder.Entity<Note>()
                 .HasOne(n => n.User)
                 .WithMany(u => u.Notes)
                 .HasForeignKey(n => n.UserId)
-                .OnDelete(DeleteBehavior.Restrict); 
+                .OnDelete(DeleteBehavior.Restrict);
 
             modelBuilder.Entity<Comment>()
                 .HasOne(c => c.User)
@@ -39,13 +38,10 @@ namespace DataAccess.Context
                 .OnDelete(DeleteBehavior.Restrict);
 
             modelBuilder.Entity<Course>()
-                .HasOne(c => c.User)
-                .WithMany(u => u.Courses)
-                .HasForeignKey(c => c.UserId)
+                .HasOne(c => c.User) 
+                .WithMany(u => u.Courses) 
+                .HasForeignKey(c => c.UserId) 
                 .OnDelete(DeleteBehavior.Restrict);
         }
-
-
-
     }
 }

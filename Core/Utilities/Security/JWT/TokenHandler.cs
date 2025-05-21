@@ -7,7 +7,7 @@ using System.Security.Claims;
 using System.Text;
 
 
-namespace Core.Utilities.Security.JWT
+ namespace Core.Utilities.Security.JWT
 {
     public class TokenHandler : ITokenHandler
     {

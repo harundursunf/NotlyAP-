@@ -15,10 +15,10 @@ namespace Core.Dto
             public string Email { get; set; }
             public string Password { get; set; }
 
-            public string? ProfilePictureUrl { get; set; } // Profil fotoğrafı URL'si
-            public string? Bio { get; set; }             // Biyografi
-            public string? University { get; set; }      // Üniversite
-            public string? Department { get; set; }      // Bölüm
+            public string? ProfilePictureUrl { get; set; } 
+            public string? Bio { get; set; }             
+            public string? University { get; set; }      
+            public string? Department { get; set; }     
         }
     }
 

@@ -1,12 +1,10 @@
-﻿// WebApi/Controllers/LikesController.cs
-using Businness.Abstract;
-using Core.Dto.Core.Dto; // Ensure this is the correct namespace for LikeDto
+﻿using Businness.Abstract;
+using Core.Dto; 
+using Core.Dto.Core.Dto;
 using Microsoft.AspNetCore.Mvc;
 using System.Collections.Generic;
 using System.Linq;
-using Microsoft.AspNetCore.Authorization;
 
-// [Authorize] // Uncomment if like operations require authorization
 [ApiController]
 [Route("api/[controller]")]
 public class LikesController : ControllerBase
@@ -21,14 +19,14 @@ public class LikesController : ControllerBase
     [HttpGet]
     public ActionResult<List<LikeDto>> GetAll()
     {
-        var likes = _likeService.GetAll();
+        var likes = _likeService.GetAll(); 
         return Ok(likes);
     }
 
-    [HttpGet("{id}", Name = "GetLikeById")] // Added Name for CreatedAtAction
+    [HttpGet("{id}", Name = "GetLikeById")]
     public ActionResult<LikeDto> GetById(int id)
     {
-        var like = _likeService.GetById(id);
+        var like = _likeService.GetById(id); 
         if (like == null)
         {
             return NotFound($"Like with ID {id} not found.");
@@ -36,70 +34,101 @@ public class LikesController : ControllerBase
         return Ok(like);
     }
 
-    [HttpPost]
-    public IActionResult Add([FromBody] LikeDto likeDto) 
+    public class LikeActionRequestDto
+    {
+        public int UserId { get; set; } 
+        public int NoteId { get; set; }
+      
+        public string UserFullName { get; set; } 
+        public string NoteTitle { get; set; }    
+    }
+
+    [HttpPost] 
+    public IActionResult Add([FromBody] LikeActionRequestDto requestDto)
     {
         if (!ModelState.IsValid)
         {
             return BadRequest(ModelState);
         }
 
-        LikeDto createdLikeDto = _likeService.Add(likeDto);
-
-        if (createdLikeDto == null || createdLikeDto.Id == 0)
+        
+        if (requestDto.UserId == 0 || requestDto.NoteId == 0)
         {
-           
-            return StatusCode(500, "Beğeni oluşturulamadı veya oluşturulan beğeniye ait ID alınamadı.");
+            return BadRequest("UserId ve NoteId alanları gereklidir ve geçerli olmalıdır.");
         }
 
-        
-        return CreatedAtAction(nameof(GetById), new { id = createdLikeDto.Id }, createdLikeDto);
+        var likeDtoForService = new LikeDto
+        {
+            UserId = requestDto.UserId, 
+            NoteId = requestDto.NoteId,
+          
+        };
+
+        LikeDto resultLikeDto = _likeService.Add(likeDtoForService); 
+        return Ok(resultLikeDto);
     }
 
-    [HttpPut("{id}")] 
-    public IActionResult Update(int id, [FromBody] LikeDto likeDto)
+
+    [HttpPut("{id}")]
+    public IActionResult Update(int id, [FromBody] LikeDto likeDto) 
     {
-        if (id != likeDto.Id)
+       
+        if (likeDto.Id == 0) likeDto.Id = id;
+        else if (id != likeDto.Id)
         {
-            return BadRequest("ID mismatch: ID in URL does not match ID in request body.");
+            return BadRequest("ID uyuşmazlığı.");
         }
+
         if (!ModelState.IsValid)
         {
             return BadRequest(ModelState);
         }
-
-        var existingLike = _likeService.GetById(id);
-        if (existingLike == null)
-        {
-            return NotFound($"Like with ID {id} not found for update.");
-        }
-
-        _likeService.Update(likeDto); 
-        return NoContent(); 
+        _likeService.Update(likeDto);
+        return NoContent();
     }
 
-    [HttpDelete("{id}")]
-    public IActionResult Delete(int id)
+   
+    [HttpDelete("{likeId}")] 
+    public IActionResult DeleteByLikeId(int likeId)
     {
-        var likeDto = _likeService.GetById(id); 
-        if (likeDto == null)
+     
+        var like = _likeService.GetById(likeId); 
+        if (like == null)
         {
-            return NotFound($"Like with ID {id} not found for deletion.");
+            return NotFound($"Like with ID {likeId} not found for deletion.");
         }
-
-        
-        _likeService.Delete(likeDto);
-        return NoContent(); 
+        _likeService.DeleteByLikeId(likeId);
+        return NoContent();
     }
 
+
+    [HttpDelete("user/{userId}/note/{noteId}")]
+    public IActionResult UnlikeNote(int userId, int noteId)
+    {
+        
+        if (userId == 0 || noteId == 0)
+        {
+            return BadRequest("Geçerli UserId ve NoteId gereklidir.");
+        }
+
+        bool DTO = _likeService.DeleteByUserIdAndNoteId(userId, noteId);
+
+        if (DTO)
+        {
+            return NoContent();
+        }
+        else
+        {
+            return NotFound("Bu nota ait beğeni bulunamadı veya zaten beğenilmemişti.");
+        }
+    }
+
+   
     [HttpGet("user/{userId}")]
-    public ActionResult<List<LikeDto>> GetLikesByUserId(int userId)
+    public ActionResult<List<LikedNoteInfoDto>> GetLikesByUserId(int userId)
     {
-        var likes = _likeService.GetLikesByUserId(userId);
-        if (likes == null || !likes.Any())
-        {
-            return NotFound($"No likes found for User ID {userId}.");
-        }
-        return Ok(likes);
+       
+        var likedNotesInfo = _likeService.GetLikesByUserId(userId);
+        return Ok(likedNotesInfo);
     }
 }

@@ -28,10 +28,11 @@ namespace DataAccess.Repositories
             _dbSet.Remove(entity);
             _context.SaveChanges();
         }
-// Bu zaten virtual yapılmış, doğru.
-        {
-            return _dbSet.ToList();
-        }
+
+        public virtual List<T> GetAll()
+{
+    return _dbSet.ToList();
+}
 
         public virtual T GetById(int id) 
         {
